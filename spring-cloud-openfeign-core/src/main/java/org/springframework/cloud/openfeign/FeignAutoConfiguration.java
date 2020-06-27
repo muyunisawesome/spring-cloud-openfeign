@@ -88,6 +88,7 @@ public class FeignAutoConfiguration {
 
 	}
 
+	//这两种client都是可选的，如果默认的不在classpath中
 	// the following configuration is for alternate feign clients if
 	// SC loadbalancer is not on the class path.
 	// see corresponding configurations in FeignRibbonClientAutoConfiguration

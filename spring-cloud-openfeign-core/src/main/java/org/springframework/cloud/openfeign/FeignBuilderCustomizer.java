@@ -26,6 +26,7 @@ import feign.Feign;
 @FunctionalInterface
 public interface FeignBuilderCustomizer {
 
+	//给builder应用自定义的逻辑
 	void customize(Feign.Builder builder);
 
 }

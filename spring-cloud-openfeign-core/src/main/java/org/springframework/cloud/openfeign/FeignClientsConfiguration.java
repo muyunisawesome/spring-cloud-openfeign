@@ -133,6 +133,7 @@ public class FeignClientsConfiguration {
 		return Retryer.NEVER_RETRY;
 	}
 
+	//每个client应该都不同，所以不能用单例模式
 	@Bean
 	@Scope("prototype")
 	@ConditionalOnMissingBean

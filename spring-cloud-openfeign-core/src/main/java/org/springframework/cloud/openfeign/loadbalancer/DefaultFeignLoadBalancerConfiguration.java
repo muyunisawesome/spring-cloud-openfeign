@@ -36,6 +36,7 @@ class DefaultFeignLoadBalancerConfiguration {
 	@Bean
 	@ConditionalOnMissingBean
 	public Client feignClient(LoadBalancerClient loadBalancerClient) {
+		//用spring中的LoadBalancerClient，看代码估计是BlockingLoadBalancerClient
 		return new FeignBlockingLoadBalancerClient(new Client.Default(null, null),
 				loadBalancerClient);
 	}
