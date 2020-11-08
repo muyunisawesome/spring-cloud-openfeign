@@ -64,9 +64,10 @@ public class RequestParamParameterProcessor implements AnnotatedParameterProcess
 				"RequestParam.value() was empty on parameter %s",
 				parameterIndex);
 		context.setParameterName(name);
-
+		//获取name对应的查询参数列表，然后添加进去
 		Collection<String> query = context.setTemplateParameter(name,
 				data.template().queries().get(name));
+		//然后再次设置到template中
 		data.template().query(name, query);
 		return true;
 	}

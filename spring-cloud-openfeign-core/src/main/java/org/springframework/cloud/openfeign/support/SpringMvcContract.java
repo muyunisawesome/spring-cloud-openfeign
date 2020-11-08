@@ -69,372 +69,359 @@ import static org.springframework.core.annotation.AnnotatedElementUtils.findMerg
  * @author Olga Maciaszek-Sharma
  */
 public class SpringMvcContract extends Contract.BaseContract
-		implements ResourceLoaderAware {
+        implements ResourceLoaderAware {
 
-	private static final String ACCEPT = "Accept";
+    private static final String ACCEPT = "Accept";
 
-	private static final String CONTENT_TYPE = "Content-Type";
+    private static final String CONTENT_TYPE = "Content-Type";
 
-	private static final TypeDescriptor STRING_TYPE_DESCRIPTOR =
-			TypeDescriptor.valueOf(String.class);
-	private static final TypeDescriptor ITERABLE_TYPE_DESCRIPTOR =
-			TypeDescriptor.valueOf(Iterable.class);
+    private static final TypeDescriptor STRING_TYPE_DESCRIPTOR =
+            TypeDescriptor.valueOf(String.class);
+    private static final TypeDescriptor ITERABLE_TYPE_DESCRIPTOR =
+            TypeDescriptor.valueOf(Iterable.class);
 
-	private static final ParameterNameDiscoverer PARAMETER_NAME_DISCOVERER = new DefaultParameterNameDiscoverer();
+    private static final ParameterNameDiscoverer PARAMETER_NAME_DISCOVERER = new DefaultParameterNameDiscoverer();
 
-	private final Map<Class<? extends Annotation>, AnnotatedParameterProcessor> annotatedArgumentProcessors;
-	private final Map<String, Method> processedMethods = new HashMap<>();
+    private final Map<Class<? extends Annotation>, AnnotatedParameterProcessor> annotatedArgumentProcessors;
+    private final Map<String, Method> processedMethods = new HashMap<>();
 
-	private final ConversionService conversionService;
-	private final ConvertingExpanderFactory convertingExpanderFactory;
-	private ResourceLoader resourceLoader = new DefaultResourceLoader();
+    private final ConversionService conversionService;
+    private final ConvertingExpanderFactory convertingExpanderFactory;
+    private ResourceLoader resourceLoader = new DefaultResourceLoader();
 
-	public SpringMvcContract() {
-		this(Collections.emptyList());
-	}
+    public SpringMvcContract() {
+        this(Collections.emptyList());
+    }
 
-	public SpringMvcContract(
-			List<AnnotatedParameterProcessor> annotatedParameterProcessors) {
-		this(annotatedParameterProcessors, new DefaultConversionService());
-	}
+    public SpringMvcContract(
+            List<AnnotatedParameterProcessor> annotatedParameterProcessors) {
+        this(annotatedParameterProcessors, new DefaultConversionService());
+    }
 
-	public SpringMvcContract(
-			List<AnnotatedParameterProcessor> annotatedParameterProcessors,
-			ConversionService conversionService) {
-		Assert.notNull(annotatedParameterProcessors,
-				"Parameter processors can not be null.");
-		Assert.notNull(conversionService, "ConversionService can not be null.");
+    public SpringMvcContract(
+            List<AnnotatedParameterProcessor> annotatedParameterProcessors,
+            ConversionService conversionService) {
+        Assert.notNull(annotatedParameterProcessors,
+                "Parameter processors can not be null.");
+        Assert.notNull(conversionService, "ConversionService can not be null.");
 
-		List<AnnotatedParameterProcessor> processors;
-		if (!annotatedParameterProcessors.isEmpty()) {
-			processors = new ArrayList<>(annotatedParameterProcessors);
-		}
-		else {
-			processors = getDefaultAnnotatedArgumentsProcessors();
-		}
-		this.annotatedArgumentProcessors = toAnnotatedArgumentProcessorMap(processors);
-		this.conversionService = conversionService;
-		this.convertingExpanderFactory = new ConvertingExpanderFactory(conversionService);
-	}
+        List<AnnotatedParameterProcessor> processors;
+        if (!annotatedParameterProcessors.isEmpty()) {
+            processors = new ArrayList<>(annotatedParameterProcessors);
+        } else {
+            processors = getDefaultAnnotatedArgumentsProcessors();
+        }
+        this.annotatedArgumentProcessors = toAnnotatedArgumentProcessorMap(processors);
+        this.conversionService = conversionService;
+        this.convertingExpanderFactory = new ConvertingExpanderFactory(conversionService);
+    }
 
-	@Override
-	public void setResourceLoader(ResourceLoader resourceLoader) {
-		this.resourceLoader = resourceLoader;
-	}
+    @Override
+    public void setResourceLoader(ResourceLoader resourceLoader) {
+        this.resourceLoader = resourceLoader;
+    }
 
-	@Override
-	protected void processAnnotationOnClass(MethodMetadata data, Class<?> clz) {
-		if (clz.getInterfaces().length == 0) {
-			RequestMapping classAnnotation = findMergedAnnotation(clz,
-					RequestMapping.class);
-			if (classAnnotation != null) {
-				// Prepend path from class annotation if specified
-				if (classAnnotation.value().length > 0) {
-					String pathValue = emptyToNull(classAnnotation.value()[0]);
-					pathValue = resolve(pathValue);
-					if (!pathValue.startsWith("/")) {
-						pathValue = "/" + pathValue;
-					}
-					data.template().uri(pathValue);
-				}
-			}
-		}
-	}
+    @Override
+    protected void processAnnotationOnClass(MethodMetadata data, Class<?> clz) {
+        if (clz.getInterfaces().length == 0) {
+            RequestMapping classAnnotation = findMergedAnnotation(clz, RequestMapping.class);
+            if (classAnnotation != null) {
+                // Prepend path from class annotation if specified
+                if (classAnnotation.value().length > 0) {
+                    String pathValue = emptyToNull(classAnnotation.value()[0]);
+                    pathValue = resolve(pathValue);
+                    if (!pathValue.startsWith("/")) {
+                        pathValue = "/" + pathValue;
+                    }
+                    data.template().uri(pathValue);
+                }
+            }
+        }
+    }
 
-	@Override
-	public MethodMetadata parseAndValidateMetadata(Class<?> targetType, Method method) {
-		this.processedMethods.put(Feign.configKey(targetType, method), method);
-		MethodMetadata md = super.parseAndValidateMetadata(targetType, method);
+    @Override
+    public MethodMetadata parseAndValidateMetadata(Class<?> targetType, Method method) {
+        this.processedMethods.put(Feign.configKey(targetType, method), method);
+        MethodMetadata md = super.parseAndValidateMetadata(targetType, method);
 
-		RequestMapping classAnnotation = findMergedAnnotation(targetType,
-				RequestMapping.class);
-		if (classAnnotation != null) {
-			// produces - use from class annotation only if method has not specified this
-			if (!md.template().headers().containsKey(ACCEPT)) {
-				parseProduces(md, method, classAnnotation);
-			}
+        RequestMapping classAnnotation = findMergedAnnotation(targetType, RequestMapping.class);
+        if (classAnnotation != null) {
+            // produces - use from class annotation only if method has not specified this
+            if (!md.template().headers().containsKey(ACCEPT)) {
+                parseProduces(md, method, classAnnotation);
+            }
 
-			// consumes -- use from class annotation only if method has not specified this
-			if (!md.template().headers().containsKey(CONTENT_TYPE)) {
-				parseConsumes(md, method, classAnnotation);
-			}
+            // consumes -- use from class annotation only if method has not specified this
+            if (!md.template().headers().containsKey(CONTENT_TYPE)) {
+                parseConsumes(md, method, classAnnotation);
+            }
 
-			// headers -- class annotation is inherited to methods, always write these if
-			// present
-			parseHeaders(md, method, classAnnotation);
-		}
-		return md;
-	}
+            // headers -- class annotation is inherited to methods, always write these if
+            // present
+            parseHeaders(md, method, classAnnotation);
+        }
+        return md;
+    }
 
-	@Override
-	protected void processAnnotationOnMethod(MethodMetadata data,
-			Annotation methodAnnotation, Method method) {
-		if (!RequestMapping.class.isInstance(methodAnnotation) && !methodAnnotation
-				.annotationType().isAnnotationPresent(RequestMapping.class)) {
-			return;
-		}
+    @Override
+    protected void processAnnotationOnMethod(MethodMetadata data,
+                                             Annotation methodAnnotation, Method method) {
+        if (!RequestMapping.class.isInstance(methodAnnotation) && !methodAnnotation
+                .annotationType().isAnnotationPresent(RequestMapping.class)) {
+            return;
+        }
 
-		RequestMapping methodMapping = findMergedAnnotation(method, RequestMapping.class);
-		// HTTP Method
-		RequestMethod[] methods = methodMapping.method();
-		if (methods.length == 0) {
-			methods = new RequestMethod[] { RequestMethod.GET };
-		}
-		checkOne(method, methods, "method");
-		data.template().method(Request.HttpMethod.valueOf(methods[0].name()));
+        RequestMapping methodMapping = findMergedAnnotation(method, RequestMapping.class);
+        // HTTP Method
+        RequestMethod[] methods = methodMapping.method();
+        if (methods.length == 0) {
+            methods = new RequestMethod[]{RequestMethod.GET};
+        }
+        checkOne(method, methods, "method");
+        data.template().method(Request.HttpMethod.valueOf(methods[0].name()));
 
-		// path
-		checkAtMostOne(method, methodMapping.value(), "value");
-		if (methodMapping.value().length > 0) {
-			String pathValue = emptyToNull(methodMapping.value()[0]);
-			if (pathValue != null) {
-				pathValue = resolve(pathValue);
-				// Append path from @RequestMapping if value is present on method
-				if (!pathValue.startsWith("/")
-						&& !data.template().path().endsWith("/")) {
-					pathValue = "/" + pathValue;
-				}
-				data.template().uri(pathValue, true);
-			}
-		}
+        // path
+        checkAtMostOne(method, methodMapping.value(), "value");
+        if (methodMapping.value().length > 0) {
+            String pathValue = emptyToNull(methodMapping.value()[0]);
+            if (pathValue != null) {
+                pathValue = resolve(pathValue);
+                // Append path from @RequestMapping if value is present on method
+                if (!pathValue.startsWith("/")
+                        && !data.template().path().endsWith("/")) {
+                    pathValue = "/" + pathValue;
+                }
+                data.template().uri(pathValue, true);
+            }
+        }
 
-		// produces
-		parseProduces(data, method, methodMapping);
+        // produces
+        parseProduces(data, method, methodMapping);
 
-		// consumes
-		parseConsumes(data, method, methodMapping);
+        // consumes
+        parseConsumes(data, method, methodMapping);
 
-		// headers
-		parseHeaders(data, method, methodMapping);
+        // headers
+        parseHeaders(data, method, methodMapping);
 
-		data.indexToExpander(new LinkedHashMap<Integer, Param.Expander>());
-	}
+        data.indexToExpander(new LinkedHashMap<Integer, Param.Expander>());
+    }
 
-	private String resolve(String value) {
-		if (StringUtils.hasText(value)
-				&& this.resourceLoader instanceof ConfigurableApplicationContext) {
-			return ((ConfigurableApplicationContext) this.resourceLoader).getEnvironment()
-					.resolvePlaceholders(value);
-		}
-		return value;
-	}
+    private String resolve(String value) {
+        if (StringUtils.hasText(value) && this.resourceLoader instanceof ConfigurableApplicationContext) {
+            return ((ConfigurableApplicationContext) this.resourceLoader).getEnvironment()
+                    .resolvePlaceholders(value);
+        }
+        return value;
+    }
 
-	private void checkAtMostOne(Method method, Object[] values, String fieldName) {
-		checkState(values != null && (values.length == 0 || values.length == 1),
-				"Method %s can only contain at most 1 %s field. Found: %s",
-				method.getName(), fieldName,
-				values == null ? null : Arrays.asList(values));
-	}
+    private void checkAtMostOne(Method method, Object[] values, String fieldName) {
+        checkState(values != null && (values.length == 0 || values.length == 1),
+                "Method %s can only contain at most 1 %s field. Found: %s",
+                method.getName(), fieldName,
+                values == null ? null : Arrays.asList(values));
+    }
 
-	private void checkOne(Method method, Object[] values, String fieldName) {
-		checkState(values != null && values.length == 1,
-				"Method %s can only contain 1 %s field. Found: %s", method.getName(),
-				fieldName, values == null ? null : Arrays.asList(values));
-	}
+    private void checkOne(Method method, Object[] values, String fieldName) {
+        checkState(values != null && values.length == 1,
+                "Method %s can only contain 1 %s field. Found: %s", method.getName(),
+                fieldName, values == null ? null : Arrays.asList(values));
+    }
 
-	@Override
-	protected boolean processAnnotationsOnParameter(MethodMetadata data,
-			Annotation[] annotations, int paramIndex) {
-		boolean isHttpAnnotation = false;
+    @Override
+    protected boolean processAnnotationsOnParameter(MethodMetadata data, Annotation[] annotations, int paramIndex) {
+        boolean isHttpAnnotation = false;
 
-		AnnotatedParameterProcessor.AnnotatedParameterContext context = new SimpleAnnotatedParameterContext(
-				data, paramIndex);
-		Method method = this.processedMethods.get(data.configKey());
-		for (Annotation parameterAnnotation : annotations) {
-			AnnotatedParameterProcessor processor = this.annotatedArgumentProcessors
-					.get(parameterAnnotation.annotationType());
-			if (processor != null) {
-				Annotation processParameterAnnotation;
-				// synthesize, handling @AliasFor, while falling back to parameter name on
-				// missing String #value():
-				processParameterAnnotation = synthesizeWithMethodParameterNameAsFallbackValue(
-						parameterAnnotation, method, paramIndex);
-				isHttpAnnotation |= processor.processArgument(context,
-						processParameterAnnotation, method);
-			}
-		}
+        AnnotatedParameterProcessor.AnnotatedParameterContext context = new SimpleAnnotatedParameterContext(
+                data, paramIndex);
+        Method method = this.processedMethods.get(data.configKey());
+        for (Annotation parameterAnnotation : annotations) {
+            AnnotatedParameterProcessor processor =
+					this.annotatedArgumentProcessors.get(parameterAnnotation.annotationType());
+            if (processor != null) {
+                Annotation processParameterAnnotation;
+                // synthesize, handling @AliasFor, while falling back to parameter name on
+                // missing String #value():
+                processParameterAnnotation = synthesizeWithMethodParameterNameAsFallbackValue(
+                        parameterAnnotation, method, paramIndex);
+                //或
+                isHttpAnnotation |= processor.processArgument(context, processParameterAnnotation, method);
+            }
+        }
 
-		if (isHttpAnnotation && data.indexToExpander().get(paramIndex) == null) {
-			TypeDescriptor typeDescriptor = createTypeDescriptor(method, paramIndex);
-			if (conversionService.canConvert(typeDescriptor, STRING_TYPE_DESCRIPTOR)) {
-				Param.Expander expander =
-						convertingExpanderFactory.getExpander(typeDescriptor);
-				if (expander != null) {
-					data.indexToExpander().put(paramIndex, expander);
-				}
-			}
-		}
-		return isHttpAnnotation;
-	}
+        if (isHttpAnnotation && data.indexToExpander().get(paramIndex) == null) {
+            TypeDescriptor typeDescriptor = createTypeDescriptor(method, paramIndex);
+            if (conversionService.canConvert(typeDescriptor, STRING_TYPE_DESCRIPTOR)) {
+                Param.Expander expander = convertingExpanderFactory.getExpander(typeDescriptor);
+                if (expander != null) {
+                    //这个地方设置@RequestParam参数
+                    data.indexToExpander().put(paramIndex, expander);
+                }
+            }
+        }
+        return isHttpAnnotation;
+    }
 
-	private static TypeDescriptor createTypeDescriptor(Method method, int paramIndex) {
-		Parameter parameter = method.getParameters()[paramIndex];
-		MethodParameter methodParameter = MethodParameter.forParameter(parameter);
-		TypeDescriptor typeDescriptor = new TypeDescriptor(methodParameter);
+    private static TypeDescriptor createTypeDescriptor(Method method, int paramIndex) {
+        Parameter parameter = method.getParameters()[paramIndex];
+        MethodParameter methodParameter = MethodParameter.forParameter(parameter);
+        TypeDescriptor typeDescriptor = new TypeDescriptor(methodParameter);
 
-		// Feign applies the Param.Expander to each element of an Iterable, so in those
-		// cases we need to provide a TypeDescriptor of the element.
-		if (typeDescriptor.isAssignableTo(ITERABLE_TYPE_DESCRIPTOR)) {
-			TypeDescriptor elementTypeDescriptor =
-					typeDescriptor.getElementTypeDescriptor();
+        // Feign applies the Param.Expander to each element of an Iterable, so in those
+        // cases we need to provide a TypeDescriptor of the element.
+        if (typeDescriptor.isAssignableTo(ITERABLE_TYPE_DESCRIPTOR)) {
+            TypeDescriptor elementTypeDescriptor = typeDescriptor.getElementTypeDescriptor();
 
-			checkState(elementTypeDescriptor != null,
-					"Could not resolve element type of Iterable type %s. Not declared?",
-					typeDescriptor);
+            checkState(elementTypeDescriptor != null,
+                    "Could not resolve element type of Iterable type %s. Not declared?",
+                    typeDescriptor);
 
-			typeDescriptor = elementTypeDescriptor;
-		}
-		return typeDescriptor;
-	}
+            typeDescriptor = elementTypeDescriptor;
+        }
+        return typeDescriptor;
+    }
 
-	private void parseProduces(MethodMetadata md, Method method,
-			RequestMapping annotation) {
-		String[] serverProduces = annotation.produces();
-		String clientAccepts = serverProduces.length == 0 ? null
-				: emptyToNull(serverProduces[0]);
-		if (clientAccepts != null) {
-			md.template().header(ACCEPT, clientAccepts);
-		}
-	}
+    private void parseProduces(MethodMetadata md, Method method, RequestMapping annotation) {
+        String[] serverProduces = annotation.produces();
+        String clientAccepts = serverProduces.length == 0 ? null
+                : emptyToNull(serverProduces[0]);
+        if (clientAccepts != null) {
+            md.template().header(ACCEPT, clientAccepts);
+        }
+    }
 
-	private void parseConsumes(MethodMetadata md, Method method,
-			RequestMapping annotation) {
-		String[] serverConsumes = annotation.consumes();
-		String clientProduces = serverConsumes.length == 0 ? null
-				: emptyToNull(serverConsumes[0]);
-		if (clientProduces != null) {
-			md.template().header(CONTENT_TYPE, clientProduces);
-		}
-	}
+    private void parseConsumes(MethodMetadata md, Method method, RequestMapping annotation) {
+        String[] serverConsumes = annotation.consumes();
+        String clientProduces = serverConsumes.length == 0 ? null
+                : emptyToNull(serverConsumes[0]);
+        if (clientProduces != null) {
+            md.template().header(CONTENT_TYPE, clientProduces);
+        }
+    }
 
-	private void parseHeaders(MethodMetadata md, Method method,
-			RequestMapping annotation) {
-		// TODO: only supports one header value per key
-		if (annotation.headers() != null && annotation.headers().length > 0) {
-			for (String header : annotation.headers()) {
-				int index = header.indexOf('=');
-				if (!header.contains("!=") && index >= 0) {
-					md.template().header(resolve(header.substring(0, index)),
-						resolve(header.substring(index + 1).trim()));
-				}
-			}
-		}
-	}
+    private void parseHeaders(MethodMetadata md, Method method, RequestMapping annotation) {
+        // TODO: only supports one header value per key
+        if (annotation.headers() != null && annotation.headers().length > 0) {
+            for (String header : annotation.headers()) {
+                int index = header.indexOf('=');
+                if (!header.contains("!=") && index >= 0) {
+                    md.template().header(resolve(header.substring(0, index)),
+                            resolve(header.substring(index + 1).trim()));
+                }
+            }
+        }
+    }
 
-	private Map<Class<? extends Annotation>, AnnotatedParameterProcessor> toAnnotatedArgumentProcessorMap(
-			List<AnnotatedParameterProcessor> processors) {
-		Map<Class<? extends Annotation>, AnnotatedParameterProcessor> result = new HashMap<>();
-		for (AnnotatedParameterProcessor processor : processors) {
-			result.put(processor.getAnnotationType(), processor);
-		}
-		return result;
-	}
+    private Map<Class<? extends Annotation>, AnnotatedParameterProcessor> toAnnotatedArgumentProcessorMap(
+            List<AnnotatedParameterProcessor> processors) {
+        Map<Class<? extends Annotation>, AnnotatedParameterProcessor> result = new HashMap<>();
+        for (AnnotatedParameterProcessor processor : processors) {
+            result.put(processor.getAnnotationType(), processor);
+        }
+        return result;
+    }
 
-	private List<AnnotatedParameterProcessor> getDefaultAnnotatedArgumentsProcessors() {
+    private List<AnnotatedParameterProcessor> getDefaultAnnotatedArgumentsProcessors() {
 
-		List<AnnotatedParameterProcessor> annotatedArgumentResolvers = new ArrayList<>();
+        List<AnnotatedParameterProcessor> annotatedArgumentResolvers = new ArrayList<>();
 
-		annotatedArgumentResolvers.add(new PathVariableParameterProcessor());
-		annotatedArgumentResolvers.add(new RequestParamParameterProcessor());
-		annotatedArgumentResolvers.add(new RequestHeaderParameterProcessor());
-		annotatedArgumentResolvers.add(new QueryMapParameterProcessor());
+        annotatedArgumentResolvers.add(new PathVariableParameterProcessor());
+        annotatedArgumentResolvers.add(new RequestParamParameterProcessor());
+        annotatedArgumentResolvers.add(new RequestHeaderParameterProcessor());
+        annotatedArgumentResolvers.add(new QueryMapParameterProcessor());
 
-		return annotatedArgumentResolvers;
-	}
+        return annotatedArgumentResolvers;
+    }
 
-	private Annotation synthesizeWithMethodParameterNameAsFallbackValue(
-			Annotation parameterAnnotation, Method method, int parameterIndex) {
-		Map<String, Object> annotationAttributes = AnnotationUtils
-				.getAnnotationAttributes(parameterAnnotation);
-		Object defaultValue = AnnotationUtils.getDefaultValue(parameterAnnotation);
-		if (defaultValue instanceof String
-				&& defaultValue.equals(annotationAttributes.get(AnnotationUtils.VALUE))) {
-			Type[] parameterTypes = method.getGenericParameterTypes();
-			String[] parameterNames = PARAMETER_NAME_DISCOVERER.getParameterNames(method);
-			if (shouldAddParameterName(parameterIndex, parameterTypes, parameterNames)) {
-				annotationAttributes.put(AnnotationUtils.VALUE,
-						parameterNames[parameterIndex]);
-			}
-		}
-		return AnnotationUtils.synthesizeAnnotation(annotationAttributes,
-				parameterAnnotation.annotationType(), null);
-	}
+    private Annotation synthesizeWithMethodParameterNameAsFallbackValue(
+            Annotation parameterAnnotation, Method method, int parameterIndex) {
+        Map<String, Object> annotationAttributes = AnnotationUtils.getAnnotationAttributes(parameterAnnotation);
+        Object defaultValue = AnnotationUtils.getDefaultValue(parameterAnnotation);
+        if (defaultValue instanceof String && defaultValue.equals(annotationAttributes.get(AnnotationUtils.VALUE))) {
+            Type[] parameterTypes = method.getGenericParameterTypes();
+            String[] parameterNames = PARAMETER_NAME_DISCOVERER.getParameterNames(method);
+            if (shouldAddParameterName(parameterIndex, parameterTypes, parameterNames)) {
+                annotationAttributes.put(AnnotationUtils.VALUE, parameterNames[parameterIndex]);
+            }
+        }
+        return AnnotationUtils.synthesizeAnnotation(annotationAttributes,
+                parameterAnnotation.annotationType(), null);
+    }
 
-	private boolean shouldAddParameterName(int parameterIndex, Type[] parameterTypes, String[] parameterNames) {
-		// has a parameter name
-		return parameterNames != null && parameterNames.length > parameterIndex
-				// has a type
-				&& parameterTypes != null && parameterTypes.length > parameterIndex;
-	}
+    private boolean shouldAddParameterName(int parameterIndex, Type[] parameterTypes, String[] parameterNames) {
+        // has a parameter name
+        return parameterNames != null && parameterNames.length > parameterIndex
+                // has a type
+                && parameterTypes != null && parameterTypes.length > parameterIndex;
+    }
 
-	private class SimpleAnnotatedParameterContext
-			implements AnnotatedParameterProcessor.AnnotatedParameterContext {
+    private class SimpleAnnotatedParameterContext
+            implements AnnotatedParameterProcessor.AnnotatedParameterContext {
 
-		private final MethodMetadata methodMetadata;
+        private final MethodMetadata methodMetadata;
 
-		private final int parameterIndex;
+        private final int parameterIndex;
 
-		public SimpleAnnotatedParameterContext(MethodMetadata methodMetadata,
-				int parameterIndex) {
-			this.methodMetadata = methodMetadata;
-			this.parameterIndex = parameterIndex;
-		}
+        public SimpleAnnotatedParameterContext(MethodMetadata methodMetadata,
+                                               int parameterIndex) {
+            this.methodMetadata = methodMetadata;
+            this.parameterIndex = parameterIndex;
+        }
 
-		@Override
-		public MethodMetadata getMethodMetadata() {
-			return this.methodMetadata;
-		}
+        @Override
+        public MethodMetadata getMethodMetadata() {
+            return this.methodMetadata;
+        }
 
-		@Override
-		public int getParameterIndex() {
-			return this.parameterIndex;
-		}
+        @Override
+        public int getParameterIndex() {
+            return this.parameterIndex;
+        }
 
-		@Override
-		public void setParameterName(String name) {
-			nameParam(this.methodMetadata, name, this.parameterIndex);
-		}
+        @Override
+        public void setParameterName(String name) {
+            nameParam(this.methodMetadata, name, this.parameterIndex);
+        }
 
-		@Override
-		public Collection<String> setTemplateParameter(String name,
-				Collection<String> rest) {
-			return addTemplateParameter(rest, name);
-		}
-	}
+        @Override
+        public Collection<String> setTemplateParameter(String name,
+                                                       Collection<String> rest) {
+            return addTemplateParameter(rest, name);
+        }
+    }
 
-	/**
-	 * @deprecated Not used internally anymore. Will be removed in the future.
-	 */
-	@Deprecated
-	public static class ConvertingExpander implements Param.Expander {
+    /**
+     * @deprecated Not used internally anymore. Will be removed in the future.
+     */
+    @Deprecated
+    public static class ConvertingExpander implements Param.Expander {
 
-		private final ConversionService conversionService;
+        private final ConversionService conversionService;
 
-		public ConvertingExpander(ConversionService conversionService) {
-			this.conversionService = conversionService;
-		}
+        public ConvertingExpander(ConversionService conversionService) {
+            this.conversionService = conversionService;
+        }
 
-		@Override
-		public String expand(Object value) {
-			return this.conversionService.convert(value, String.class);
-		}
+        @Override
+        public String expand(Object value) {
+            return this.conversionService.convert(value, String.class);
+        }
 
-	}
+    }
 
-	private static class ConvertingExpanderFactory {
+    private static class ConvertingExpanderFactory {
 
-		private final ConversionService conversionService;
+        private final ConversionService conversionService;
 
-		ConvertingExpanderFactory(ConversionService conversionService) {
-			this.conversionService = conversionService;
-		}
+        ConvertingExpanderFactory(ConversionService conversionService) {
+            this.conversionService = conversionService;
+        }
 
-		Param.Expander getExpander(TypeDescriptor typeDescriptor) {
-			return value -> {
-				Object converted = this.conversionService.convert(
-						value, typeDescriptor, STRING_TYPE_DESCRIPTOR);
-				return (String) converted;
-			};
-		}
-	}
+        Param.Expander getExpander(TypeDescriptor typeDescriptor) {
+            return value -> {
+                Object converted = this.conversionService.convert(value, typeDescriptor, STRING_TYPE_DESCRIPTOR);
+                return (String) converted;
+            };
+        }
+    }
 }

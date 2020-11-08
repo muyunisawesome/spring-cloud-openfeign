@@ -52,6 +52,7 @@ public class PathVariableParameterProcessor implements AnnotatedParameterProcess
 				"PathVariable annotation was empty on param %s.", context.getParameterIndex());
 		context.setParameterName(name);
 
+		//下面这段代码一般用不到
 		MethodMetadata data = context.getMethodMetadata();
 		String varName = '{' + name + '}';
 		if (!data.template().url().contains(varName)
