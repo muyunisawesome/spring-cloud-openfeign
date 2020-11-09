@@ -27,8 +27,10 @@ import java.util.Objects;
  */
 class FeignClientSpecification implements NamedContextFactory.Specification {
 
+	//自定义配置类 对应的ApplicationContext中的bean名字
 	private String name;
 
+	//自定义配置类列表
 	private Class<?>[] configuration;
 
 	public FeignClientSpecification() {}
